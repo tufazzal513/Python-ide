@@ -283,7 +283,8 @@ fun PyMobileApp(viewModel: MainViewModel) {
                                     editorState = editorState,
                                     fileTree = fileTree,
                                     processInfo = currentProcess,
-                                    terminalOutputs = outputs
+                                    terminalOutputs = outputs,
+                                    logs = logs
                                 )
                             } else {
                                 EmptyProjectState("Select or create a project to open the IDE.")
