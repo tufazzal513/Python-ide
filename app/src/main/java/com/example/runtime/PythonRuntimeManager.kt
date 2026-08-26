@@ -155,10 +155,16 @@ def setup_redirect(out_cb, err_cb):
         command: String,
         onOutput: (String) -> Unit
     ) = withContext(Dispatchers.IO) {
-        if (command == "pip list" || command.startsWith("pip ")) {
-            onOutput("pip is managed via project dependencies. Configure requirements.txt instead.")
-        } else {
-            onOutput("Terminal commands are passed to the project context.")
+        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command), null, java.io.File(project.path))
+        val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+        val errorReader = java.io.BufferedReader(java.io.InputStreamReader(process.errorStream))
+        var line: String?
+        while (reader.readLine().also { line = it } != null) {
+            onOutput(line ?: "")
         }
+        while (errorReader.readLine().also { line = it } != null) {
+            onOutput("[ERROR] " + (line ?: ""))
+        }
+        process.waitFor()
     }
 }

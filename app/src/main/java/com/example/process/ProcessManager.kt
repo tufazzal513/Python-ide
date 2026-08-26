@@ -54,6 +54,10 @@ class ProcessManager(
         _projectOutputs.value = current
     }
 
+    fun appendTerminalOutput(projectId: String, line: String) {
+        appendOutputLine(projectId, line)
+    }
+
     fun startProject(project: Project) {
         stopProject(project.id)
 

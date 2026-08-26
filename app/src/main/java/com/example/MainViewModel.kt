@@ -478,7 +478,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 project = project,
                 command = command,
                 onOutput = { line ->
-                    // Output
+                    processManager.appendTerminalOutput(project.id, line)
                 }
             )
         }
