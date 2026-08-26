@@ -6,4 +6,5 @@ plugins {
   alias(libs.plugins.roborazzi) apply false
   alias(libs.plugins.secrets) apply false
   alias(libs.plugins.google.services) apply false
+  id("com.chaquo.python") version "17.0.0" apply false
 }
