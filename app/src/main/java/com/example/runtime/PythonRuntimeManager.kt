@@ -95,7 +95,20 @@ class PythonRuntimeManager(
                 val reader = BufferedReader(InputStreamReader(proc.inputStream))
                 val errReader = BufferedReader(InputStreamReader(proc.errorStream))
 
-                while (proc.isAlive && !isCancelled.get() && isActive) {
+                fun isProcAlive(p: Process): Boolean {
+                    return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        p.isAlive
+                    } else {
+                        try {
+                            p.exitValue()
+                            false
+                        } catch (e: IllegalThreadStateException) {
+                            true
+                        }
+                    }
+                }
+
+                while (isProcAlive(proc) && !isCancelled.get() && isActive) {
                     while (reader.ready()) {
                         val line = reader.readLine() ?: break
                         val safe = maskSecrets(line)
