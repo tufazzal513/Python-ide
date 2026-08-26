@@ -1,0 +1,6 @@
+{
+  "name": "PyMobile IDE",
+  "description": "Production-ready native Android Python IDE with multi-file code editor, real Python process manager, local web server detection, GitHub integration, and terminal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
