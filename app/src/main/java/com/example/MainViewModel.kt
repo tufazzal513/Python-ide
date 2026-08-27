@@ -473,10 +473,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun executeTerminalCommand(project: Project, command: String) {
+        val trimmed = command.trim()
+        if (trimmed.equals("clear", ignoreCase = true)) {
+            processManager.clearOutput(project.id)
+            return
+        }
+        processManager.appendTerminalOutput(project.id, "~ $ $command")
         viewModelScope.launch(Dispatchers.IO) {
             runtimeManager.executeTerminalCommand(
                 project = project,
-                command = command,
+                command = trimmed,
                 onOutput = { line ->
                     processManager.appendTerminalOutput(project.id, line)
                 }

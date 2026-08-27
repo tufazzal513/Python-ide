@@ -78,7 +78,9 @@ import com.example.ui.theme.PyMobileTheme
 
 sealed class NavRoute(val route: String, val title: String, val icon: ImageVector) {
     object Home : NavRoute("home", "Projects", Icons.Default.Home)
-    object Workspace : NavRoute("workspace", "IDE", Icons.Default.Code)
+    object Editor : NavRoute("editor", "Editor", Icons.Default.Code)
+    object Terminal : NavRoute("terminal", "Terminal", Icons.Default.Terminal)
+    object Files : NavRoute("files", "Files", Icons.Default.Folder)
     object Dashboard : NavRoute("dashboard", "Config", Icons.Default.Dashboard)
     object Running : NavRoute("running", "Processes", Icons.Default.PlayCircle)
     object Git : NavRoute("git", "Git", Icons.Default.CallSplit)
@@ -115,7 +117,7 @@ fun PyMobileApp(viewModel: MainViewModel) {
     val logs by viewModel.logs.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
 
-    var currentRoute by remember { mutableStateOf<NavRoute>(NavRoute.Workspace) }
+    var currentRoute by remember { mutableStateOf<NavRoute>(NavRoute.Home) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showNewProjectDialog by remember { mutableStateOf(false) }
@@ -140,19 +142,21 @@ fun PyMobileApp(viewModel: MainViewModel) {
     }
 
     BackHandler(
-        enabled = showNewProjectDialog || showCloneGitHubDialog || (currentRoute == NavRoute.Workspace && editorState.isSearching) || currentRoute != NavRoute.Home
+        enabled = showNewProjectDialog || showCloneGitHubDialog || (currentRoute == NavRoute.Editor && editorState.isSearching) || currentRoute != NavRoute.Home
     ) {
         when {
             showNewProjectDialog -> showNewProjectDialog = false
             showCloneGitHubDialog -> showCloneGitHubDialog = false
-            currentRoute == NavRoute.Workspace && editorState.isSearching -> viewModel.toggleSearch()
+            currentRoute == NavRoute.Editor && editorState.isSearching -> viewModel.toggleSearch()
             currentRoute != NavRoute.Home -> currentRoute = NavRoute.Home
         }
     }
 
     val navItems = listOf(
         NavRoute.Home,
-        NavRoute.Workspace,
+        NavRoute.Editor,
+        NavRoute.Terminal,
+        NavRoute.Files,
         NavRoute.Dashboard,
         NavRoute.Running,
         NavRoute.Git,
@@ -177,7 +181,9 @@ fun PyMobileApp(viewModel: MainViewModel) {
                         // Display top 5 main tabs on phone bottom bar
                         val phoneNavItems = listOf(
                             NavRoute.Home,
-                            NavRoute.Workspace,
+                            NavRoute.Editor,
+                            NavRoute.Terminal,
+                            NavRoute.Files,
                             NavRoute.Running
                         )
 
@@ -258,36 +264,75 @@ fun PyMobileApp(viewModel: MainViewModel) {
                             runningProcesses = runningProcesses,
                             onSelectProject = { proj ->
                                 viewModel.selectProject(proj)
-                                currentRoute = NavRoute.Workspace
+                                currentRoute = NavRoute.Editor
                             },
                             onOpenNewProjectDialog = { showNewProjectDialog = true },
                             onOpenCloneGitHubDialog = { showCloneGitHubDialog = true },
                             onOpenImportZip = { zipPickerLauncher.launch("application/zip") },
                             onRunProject = { proj ->
                                 viewModel.runProject(proj)
-                                currentRoute = NavRoute.Workspace
+                                currentRoute = NavRoute.Editor
                             },
                             onStopProject = { projectId -> viewModel.stopProject(projectId) },
                             onBackupProject = { proj -> viewModel.backupProject(proj) },
                             onDeleteProject = { proj -> viewModel.deleteProject(proj) }
                         )
 
-                        NavRoute.Workspace -> {
+                        NavRoute.Editor -> CodeEditorView(
+                            state = editorState,
+                            onTabSelect = { viewModel.selectTab(it) },
+                            onTabClose = { viewModel.closeTab(it) },
+                            onContentChange = { viewModel.onEditorContentChange(it) },
+                            onSave = { viewModel.saveActiveFile() },
+                            onRun = { (selectedProject ?: projects.firstOrNull())?.let { viewModel.runProject(it) } },
+                            onUndo = { viewModel.undoEditor() },
+                            onRedo = { viewModel.redoEditor() },
+                            onToggleSearch = { viewModel.toggleSearch() },
+                            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                            onReplaceQueryChange = { viewModel.onReplaceQueryChange(it) },
+                            onReplaceOne = { viewModel.replaceOne() },
+                            onReplaceAll = { viewModel.replaceAll() },
+                            onGoToLine = { viewModel.goToLine(it) },
+                            onInsertSymbol = { viewModel.insertSymbol(it) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        NavRoute.Terminal -> {
                             val activeProj = selectedProject ?: projects.firstOrNull()
                             if (activeProj != null) {
                                 val currentProcess = runningProcesses.firstOrNull { it.projectId == activeProj.id }
                                 val outputs = projectOutputs[activeProj.id] ?: emptyList()
-                                com.example.ui.screens.IdeWorkspaceScreen(
+                                TerminalView(
                                     project = activeProj,
-                                    viewModel = viewModel,
-                                    editorState = editorState,
-                                    fileTree = fileTree,
                                     processInfo = currentProcess,
-                                    terminalOutputs = outputs,
-                                    logs = logs
+                                    outputLines = outputs,
+                                    onRunProject = { (selectedProject ?: projects.firstOrNull())?.let { viewModel.runProject(it) } },
+                                    onStopProject = { viewModel.stopProject(activeProj.id) },
+                                    onRestartProject = { viewModel.restartProject(activeProj) },
+                                    onInstallDependencies = { viewModel.installDependencies(activeProj) },
+                                    onClearOutput = { viewModel.processManager.clearOutput(activeProj.id) },
+                                    onExecuteCommand = { cmd -> viewModel.executeTerminalCommand(activeProj, cmd) }
                                 )
                             } else {
-                                EmptyProjectState("Select or create a project to open the IDE.")
+                                EmptyProjectState("Select or create a project to use the terminal.")
+                            }
+                        }
+                        NavRoute.Files -> {
+                            val activeProj = selectedProject ?: projects.firstOrNull()
+                            if (activeProj != null) {
+                                FilesScreen(
+                                    project = activeProj,
+                                    fileTree = fileTree,
+                                    onOpenFile = { file -> 
+                                        viewModel.openFileInEditor(file)
+                                        currentRoute = NavRoute.Editor
+                                    },
+                                    onCreateFile = { dir, name -> viewModel.createFile(dir, name) },
+                                    onCreateDirectory = { dir, name -> viewModel.createDirectory(dir, name) },
+                                    onDeleteFile = { file -> viewModel.deleteFile(file) },
+                                    onRenameFile = { file, newName -> viewModel.renameFile(file, newName) }
+                                )
+                            } else {
+                                EmptyProjectState("Select or create a project to view files.")
                             }
                         }
                         NavRoute.Dashboard -> {
@@ -300,14 +345,14 @@ fun PyMobileApp(viewModel: MainViewModel) {
                                     dependencies = dependencies,
                                     onUpdateProject = { viewModel.updateProject(it) },
                                     onRunProject = {
-                                        viewModel.runProject(activeProj)
-                                        currentRoute = NavRoute.Workspace
+                                        (selectedProject ?: projects.firstOrNull())?.let { viewModel.runProject(it) }
+                                        currentRoute = NavRoute.Editor
                                     },
                                     onStopProject = { viewModel.stopProject(activeProj.id) },
                                     onRestartProject = { viewModel.restartProject(activeProj) },
                                     onInstallDependencies = { viewModel.installDependencies(activeProj) },
-                                    onNavigateToFiles = { currentRoute = NavRoute.Workspace },
-                                    onNavigateToTerminal = { currentRoute = NavRoute.Workspace },
+                                    onNavigateToFiles = { currentRoute = NavRoute.Files },
+                                    onNavigateToTerminal = { currentRoute = NavRoute.Terminal },
                                     onNavigateToLogs = { currentRoute = NavRoute.Logs }
                                 )
                             } else {
@@ -373,7 +418,7 @@ fun PyMobileApp(viewModel: MainViewModel) {
             onCreate = { name, template, version ->
                 viewModel.createProject(name, template, version)
                 showNewProjectDialog = false
-                currentRoute = NavRoute.Workspace
+                currentRoute = NavRoute.Editor
             }
         )
     }
